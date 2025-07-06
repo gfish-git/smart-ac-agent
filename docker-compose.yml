@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ./homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      - TZ=America/New_York  # Change to your timezone
+
+  smart-ac-agent:
+    container_name: smart-ac-agent
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - IFTTT_KEY=${IFTTT_KEY}
+      - IFTTT_AC_ON_EVENT=${IFTTT_AC_ON_EVENT:-ac_on}
+      - IFTTT_AC_OFF_EVENT=${IFTTT_AC_OFF_EVENT:-ac_off}
+      - HOME_LAT=${HOME_LAT}
+      - HOME_LON=${HOME_LON}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - homeassistant
+    restart: unless-stopped
+    network_mode: host

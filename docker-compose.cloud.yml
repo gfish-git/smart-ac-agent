@@ -1,0 +1,124 @@
+version: "3.9"
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    profiles:
+      - cloud
+      - local
+    volumes:
+      - ./homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=${TIMEZONE:-America/New_York}
+      - EXTERNAL_URL=${EXTERNAL_URL:-http://localhost:8123}
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  smart-ac-agent:
+    container_name: smart-ac-agent
+    build: .
+    profiles:
+      - cloud
+      - local
+    ports:
+      - "8000:8000"
+    environment:
+      - IFTTT_KEY=${IFTTT_KEY}
+      - IFTTT_AC_ON_EVENT=${IFTTT_AC_ON_EVENT:-ac_on}
+      - IFTTT_AC_OFF_EVENT=${IFTTT_AC_OFF_EVENT:-ac_off}
+      - HOME_LAT=${HOME_LAT}
+      - HOME_LON=${HOME_LON}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-cloud}
+    depends_on:
+      - homeassistant
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Cloud-only services
+  caddy:
+    container_name: caddy
+    image: caddy:latest
+    profiles:
+      - cloud
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      - homeassistant
+      - smart-ac-agent
+
+  # Local-only services (for Coral dev board)
+  coral-optimizer:
+    container_name: coral-optimizer
+    image: python:3.11-slim
+    profiles:
+      - local
+    volumes:
+      - ./coral:/coral
+      - ./models:/models
+    restart: unless-stopped
+    command: ["python", "/coral/optimizer.py"]
+    depends_on:
+      - smart-ac-agent
+
+  # Monitoring services (optional)
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    profiles:
+      - monitoring
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    restart: unless-stopped
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    profiles:
+      - monitoring
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    driver: bridge 

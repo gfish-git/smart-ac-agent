@@ -1,0 +1,91 @@
+# Caddy configuration for Smart AC Agent
+# Replace yourdomain.com with your actual domain
+
+{$DOMAIN:localhost} {
+    # Home Assistant
+    handle /api/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /auth/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /static/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /frontend_latest/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /service_worker.js {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /manifest.json {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /websocket {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /lovelace/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /local/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    handle /hacsfiles/* {
+        reverse_proxy homeassistant:8123
+    }
+    
+    # AC Agent API
+    handle /ping {
+        reverse_proxy smart-ac-agent:8000
+    }
+    
+    handle /health {
+        reverse_proxy smart-ac-agent:8000
+    }
+    
+    handle /metrics {
+        reverse_proxy smart-ac-agent:8000
+    }
+    
+    # Default to Home Assistant
+    handle {
+        reverse_proxy homeassistant:8123
+    }
+    
+    # Enable real IP forwarding
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto {scheme}
+    
+    # Enable compression
+    encode gzip
+    
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
+# Health check endpoint
+:8080 {
+    respond /health "OK" 200
+} 

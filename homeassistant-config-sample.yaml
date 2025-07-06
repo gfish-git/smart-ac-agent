@@ -1,0 +1,103 @@
+# Sample Home Assistant Configuration for Smart AC Agent
+# Add these sections to your configuration.yaml file
+
+# REST command to send location updates to AC agent
+rest_command:
+  update_ac_agent:
+    url: "http://localhost:8000/ping"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: >
+      {
+        "lat": {{ lat }},
+        "lon": {{ lon }},
+        "speed_mph": {{ speed | default(0) }}
+      }
+
+# Sample automation to trigger AC control based on location
+# This will be created through the UI, but here's the YAML for reference
+automation:
+  - alias: "AC Control Based on Location"
+    description: "Send location updates to AC agent when location changes"
+    trigger:
+      - platform: state
+        entity_id: device_tracker.your_phone  # Replace with your actual device tracker
+        attribute: latitude
+      - platform: state
+        entity_id: device_tracker.your_phone  # Replace with your actual device tracker
+        attribute: longitude
+    condition:
+      # Only trigger if location has actually changed significantly
+      - condition: template
+        value_template: >
+          {% set old_lat = trigger.from_state.attributes.latitude | default(0) %}
+          {% set new_lat = trigger.to_state.attributes.latitude | default(0) %}
+          {% set old_lon = trigger.from_state.attributes.longitude | default(0) %}
+          {% set new_lon = trigger.to_state.attributes.longitude | default(0) %}
+          {% set lat_diff = (new_lat - old_lat) | abs %}
+          {% set lon_diff = (new_lon - old_lon) | abs %}
+          {{ lat_diff > 0.001 or lon_diff > 0.001 }}
+    action:
+      - service: rest_command.update_ac_agent
+        data:
+          lat: "{{ state_attr('device_tracker.your_phone', 'latitude') }}"
+          lon: "{{ state_attr('device_tracker.your_phone', 'longitude') }}"
+          speed: "{{ state_attr('device_tracker.your_phone', 'speed') | default(0) }}"
+    mode: single
+    max_exceeded: silent
+
+# Optional: Create a sensor to track distance to home
+# This helps with debugging and monitoring
+sensor:
+  - platform: template
+    sensors:
+      distance_to_home:
+        friendly_name: "Distance to Home"
+        unit_of_measurement: "mi"
+        value_template: >
+          {% set home_lat = state_attr('zone.home', 'latitude') %}
+          {% set home_lon = state_attr('zone.home', 'longitude') %}
+          {% set phone_lat = state_attr('device_tracker.your_phone', 'latitude') %}
+          {% set phone_lon = state_attr('device_tracker.your_phone', 'longitude') %}
+          {% if phone_lat and phone_lon and home_lat and home_lon %}
+            {% set lat1 = home_lat * pi / 180 %}
+            {% set lon1 = home_lon * pi / 180 %}
+            {% set lat2 = phone_lat * pi / 180 %}
+            {% set lon2 = phone_lon * pi / 180 %}
+            {% set dlat = lat2 - lat1 %}
+            {% set dlon = lon2 - lon1 %}
+            {% set a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2 %}
+            {% set c = 2 * atan2(sqrt(a), sqrt(1-a)) %}
+            {% set distance = 3958.8 * c %}
+            {{ distance | round(2) }}
+          {% else %}
+            0
+          {% endif %}
+
+# Optional: Dashboard configuration
+# Add this to your dashboard YAML or create cards through the UI
+lovelace:
+  dashboards:
+    ac-control:
+      mode: yaml
+      title: "AC Control"
+      filename: ac-control.yaml
+      
+# Contents for ac-control.yaml (create this file in your config directory)
+# views:
+#   - title: "Smart AC Control"
+#     cards:
+#       - type: entities
+#         title: "Location & AC Status"
+#         entities:
+#           - entity: device_tracker.your_phone
+#             name: "Phone Location"
+#           - entity: sensor.distance_to_home
+#             name: "Distance to Home"
+#           - entity: automation.ac_control_based_on_location
+#             name: "AC Automation"
+#       - type: map
+#         entities:
+#           - device_tracker.your_phone
+#         hours_to_show: 24 

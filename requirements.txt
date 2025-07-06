@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+requests
+openai
+git+https://github.com/openai/openai-agents-python.git
