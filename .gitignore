@@ -1,5 +1,6 @@
 # Environment variables (contains sensitive tokens)
 .env
+.env.local
 
 # Home Assistant configuration directory
 homeassistant/
