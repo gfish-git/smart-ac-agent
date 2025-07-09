@@ -48,4 +48,4 @@ Thumbs.db
 logs/
 
 # Docker
-.dockerignore 
+.dockerignore .env.save
