@@ -1,46 +1,50 @@
 # Caddy configuration for Smart AC Agent
-# Replace yourdomain.com with your actual domain
+# Working with Cloudflare proxy - HTTP only, let Cloudflare handle SSL
 
-{$DOMAIN:localhost} {
+{
+    auto_https off
+}
+
+home-assistant.gabefish.com:80 {
     # Home Assistant
     handle /api/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /auth/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /static/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /frontend_latest/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /service_worker.js {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /manifest.json {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /websocket {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /lovelace/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /local/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     handle /hacsfiles/* {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
     # AC Agent API
@@ -58,25 +62,16 @@
     
     # Default to Home Assistant
     handle {
-        reverse_proxy homeassistant:8123
+        reverse_proxy 192.168.0.122:8123
     }
     
-    # Enable real IP forwarding
-    header_up X-Real-IP {remote_host}
-    header_up X-Forwarded-For {remote_host}
-    header_up X-Forwarded-Proto {scheme}
+    # Enable real IP forwarding for Cloudflare
+    request_header X-Real-IP {header.CF-Connecting-IP}
+    request_header X-Forwarded-For {header.CF-Connecting-IP}
+    request_header X-Forwarded-Proto https
     
     # Enable compression
     encode gzip
-    
-    # Security headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        X-XSS-Protection "1; mode=block"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
     
     # Logging
     log {

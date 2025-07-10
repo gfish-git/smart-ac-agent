@@ -248,3 +248,74 @@ async def ping(req: Request):
     await run_agent_decision()
     
     return {"status": "ok", **obs}
+
+@app.post("/test")
+async def test_endpoint():
+    """Test endpoint that simulates a location update without requiring coordinates from Home Assistant."""
+    logger.info("🧪 Test endpoint called - simulating location update")
+    
+    # Simulate a location 1.5 miles from home, approaching
+    test_lat, test_lon = 37.7749, -122.4194  # Example coordinates
+    test_speed = 25
+    
+    # Create test payload
+    test_payload = {
+        "lat": test_lat,
+        "lon": test_lon,
+        "speed_mph": test_speed
+    }
+    
+    # Process the same way as normal ping
+    loc = (test_payload["lat"], test_payload["lon"])
+    speed_mph = test_payload.get("speed_mph", 0)
+    dist = haversine(loc, HOME)
+    
+    # Clean up old location history
+    cleanup_old_locations()
+    
+    # Add current location to history
+    location_entry = {
+        "timestamp": time.time(),
+        "distance": dist,
+        "speed": speed_mph,
+        "lat": loc[0],
+        "lon": loc[1]
+    }
+    location_history.append(location_entry)
+    
+    # Determine movement trend
+    movement_trend = determine_movement_trend()
+    
+    obs = {
+        "distance_miles": dist, 
+        "speed_mph": speed_mph,
+        "movement_trend": movement_trend,
+        "history_samples": len(location_history)
+    }
+    
+    logger.info(f"📍 Test location update: {dist:.2f} miles, {movement_trend}, {speed_mph} mph")
+    
+    # Run the agent decision
+    @traceable(name="test_agent_decision")
+    async def run_test_agent_decision():
+        try:
+            agent_result = await runner.run(agent, str(obs))
+            logger.info(f"🤖 Test agent decision completed")
+            return {
+                "agent_result": "Test decision completed",
+                "location_distance": dist,
+                "movement_trend": movement_trend,
+                "status": "success"
+            }
+        except Exception as e:
+            logger.error(f"❌ Test agent decision failed: {e}")
+            raise e
+    
+    await run_test_agent_decision()
+    
+    return {
+        "status": "test_ok", 
+        "message": "Test endpoint processed successfully",
+        "simulated_location": {"lat": test_lat, "lon": test_lon},
+        **obs
+    }
